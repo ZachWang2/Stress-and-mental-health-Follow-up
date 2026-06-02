@@ -29,7 +29,7 @@ const defaultWeeklyForm = {
 const dailySliders = [
   ["sleepQuality", "睡眠质量"],
   ["somaticLevel", "躯体化/疼痛"],
-  ["rechargeEase", "今天有没有缓过来一点"],
+  ["rechargeEase", "给今天打个分吧"],
 ];
 
 const weeklyItems = [
