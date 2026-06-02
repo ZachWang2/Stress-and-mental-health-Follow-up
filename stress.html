@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>精神心理随访本地预览</title>
+    <link rel="stylesheet" href="./stress.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Low Burden Patient Monitor</p>
+          <h1>精神心理随访本地预览</h1>
+          <p class="lead">日常记录睡眠、躯体化/疼痛 和三件自我肯定；每周一次标准化周评。</p>
+        </div>
+        <div class="top-actions">
+          <button id="seedBtn" type="button">生成示例数据</button>
+          <button id="exportBtn" type="button">导出 CSV</button>
+          <button id="summaryBtn" type="button">导出复诊摘要</button>
+        </div>
+      </section>
+
+      <section class="summary">
+        <article><span>最新日常负荷</span><strong id="latestScore">--</strong></article>
+        <article><span>7 日均值</span><strong id="weekScore">--</strong></article>
+        <article><span>平均睡眠</span><strong id="sleepAvg">--</strong></article>
+        <article><span>平均躯体化</span><strong id="somaticAvg">--</strong></article>
+      </section>
+
+      <section class="workspace">
+        <form id="dailyForm" class="entry">
+          <div class="form-head">
+            <div><p class="eyebrow">Daily 60 Seconds</p><h2>日常低负担记录</h2></div>
+            <label>日期<input id="date" type="date" required /></label>
+          </div>
+
+          <label>睡眠小时<input id="sleepHours" type="number" min="0" max="14" step="0.5" value="7" /></label>
+
+          <div class="slider-list">
+            <label><span>睡眠质量</span><input id="sleepQuality" type="range" min="0" max="4" value="2" /><output>2</output></label>
+            <label><span>躯体化/疼痛</span><input id="somaticLevel" type="range" min="0" max="4" value="2" /><output>2</output></label>
+            <label><span>给今天打个分吧</span><input id="rechargeEase" type="range" min="0" max="4" value="2" /><output>2</output></label>
+          </div>
+
+          <fieldset class="affirmations">
+            <legend>今天值得肯定自己的三件事</legend>
+            <input id="affirmation1" placeholder="比如：按时吃饭" />
+            <input id="affirmation2" placeholder="比如：完成了一件小事" />
+            <input id="affirmation3" placeholder="比如：愿意记录今天的状态" />
+          </fieldset>
+
+          <label class="note-field">随心记录<textarea id="note" rows="3" placeholder="想写什么都可以：身体哪里不舒服、今天发生了什么、服药变化、压力事件"></textarea></label>
+          <button class="primary" type="submit">保存日常记录</button>
+        </form>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div><p class="eyebrow">Trend</p><h2>最近 30 天睡眠与躯体化趋势</h2></div>
+            <button id="clearBtn" class="danger" type="button">清空数据</button>
+          </div>
+          <canvas id="trendChart" width="920" height="420"></canvas>
+        </section>
+      </section>
+
+      <section class="integration-grid">
+        <article class="integration-card"><div><p class="eyebrow">Interface</p><h2>睡眠质量接口</h2></div><span>待接入</span><p>未来可从手环、手机健康数据或睡眠 App 读取睡眠时长、醒来次数、睡眠评分。</p><button id="sleepSyncBtn" type="button">同步睡眠</button></article>
+        <article class="integration-card"><div><p class="eyebrow">Interface</p><h2>蓝牙设备接口</h2></div><span>待接入</span><p>预留 BLE 设备连接入口，可接肌电、心率、皮电或疼痛相关可穿戴设备。</p><button id="bluetoothBtn" type="button">连接蓝牙</button></article>
+        <article class="integration-card"><div><p class="eyebrow">Interface</p><h2>联网同步接口</h2></div><span>本地模式</span><p>当前数据只保存在浏览器。未来可接登录、数据库、医生端和加密同步。</p></article>
+        <article class="integration-card"><div><p class="eyebrow">Interface</p><h2>App 使用监管接口</h2></div><span>待接入</span><p>预留每日短视频、社交软件、游戏等使用时长字段，后续可由系统权限或手动导入。</p><button id="appUsageBtn" type="button">读取使用时长</button></article>
+      </section>
+
+      <section class="weekly-card">
+        <form id="weeklyForm">
+          <div class="form-head">
+            <div><p class="eyebrow">Weekly Scale</p><h2>每周一次标准化周评</h2><p id="weeklyDue" class="subtle">下一次建议日期：今天可以做第一次周评</p></div>
+            <label>周评日期<input id="weekDate" type="date" required /></label>
+          </div>
+
+          <div class="scale-grid">
+            <label><span>情绪低落/压抑</span><input id="mood" type="range" min="0" max="4" value="2" /><output>2</output></label>
+            <label><span>焦虑/担忧</span><input id="anxiety" type="range" min="0" max="4" value="2" /><output>2</output></label>
+            <label><span>兴趣下降</span><input id="interest" type="range" min="0" max="4" value="2" /><output>2</output></label>
+            <label><span>精力不足</span><input id="energy" type="range" min="0" max="4" value="2" /><output>2</output></label>
+            <label><span>生活功能受影响</span><input id="functioning" type="range" min="0" max="4" value="2" /><output>2</output></label>
+          </div>
+
+          <label class="risk-check"><input id="riskFlag" type="checkbox" /><span>本周出现需要医生或可信赖的人尽快知道的风险想法/行为</span></label>
+          <label class="note-field">周评备注<textarea id="weeklyNote" rows="3" placeholder="可选：本周变化、诱因、药物副作用、想和医生讨论的问题"></textarea></label>
+          <button class="primary" type="submit">保存周评</button>
+        </form>
+      </section>
+
+      <section class="tree-hole">
+        <form id="ventForm">
+          <div class="form-head">
+            <div><p class="eyebrow">Private Outlet</p><h2>树洞</h2><p class="subtle">可以发泄情绪、输出负能量或写下不想整理的话。当前只保存在本地。</p></div>
+            <span class="save-status">AI 接口预留</span>
+          </div>
+          <textarea id="ventText" rows="5" placeholder="把今天憋着的话写在这里。这里不是诊断，也不会评价你。"></textarea>
+          <label class="note-field">未来 AI 对话上下文接口<textarea id="aiDraft" rows="3" placeholder="可选：未来接入 AI 时，希望它如何回应？比如只倾听、帮我整理、提醒我联系医生。"></textarea></label>
+          <button class="primary" type="submit">存入树洞</button>
+        </form>
+      </section>
+
+      <section class="insight-grid">
+        <article class="insight"><p class="eyebrow">Current Signal</p><h2 id="signalTitle">等待记录</h2><p id="signalText">保存记录后显示趋势提示。</p></article>
+        <article class="insight reliability"><p class="eyebrow">Score Explanation</p><h2>评分解释</h2><div id="explainList" class="explain-list"></div></article>
+      </section>
+
+      <section class="records">
+        <div class="panel-head"><h2>最近记录</h2><span id="saveStatus" class="save-status">本地保存</span></div>
+        <div id="recordList" class="record-list"></div>
+      </section>
+
+      <section class="research-note">
+        <h2>定位说明</h2>
+        <p>联网、蓝牙、AI 对话和 App 使用监管目前只是接口占位。这个本地预览不是诊断工具，也不能替代医生评估。</p>
+      </section>
+    </main>
+    <script src="./stress.js"></script>
+  </body>
+</html>
