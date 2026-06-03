@@ -167,7 +167,8 @@ button:hover {
 .research-note,
 .weekly-card,
 .tree-hole,
-.integration-card {
+.integration-card,
+.scared-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.94);
@@ -277,6 +278,105 @@ output {
 .weekly-card {
   margin-top: 18px;
   border-left: 6px solid var(--blue);
+}
+
+.scared-card {
+  margin-top: 18px;
+  border-left: 6px solid var(--cyan);
+}
+
+.scared-form {
+  display: grid;
+  gap: 16px;
+}
+
+.scared-meta {
+  display: grid;
+  grid-template-columns: 160px minmax(180px, 260px);
+  gap: 12px;
+}
+
+.scared-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  border: 1px solid rgba(27, 127, 151, 0.22);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: rgba(27, 127, 151, 0.07);
+}
+
+.scared-summary strong {
+  font-size: 1.1rem;
+}
+
+.scared-summary span {
+  color: var(--muted);
+}
+
+.subscale-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.subscale {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 11px;
+  background: #fbfcfb;
+}
+
+.subscale.elevated {
+  border-color: rgba(197, 82, 69, 0.35);
+  background: rgba(197, 82, 69, 0.07);
+}
+
+.subscale span,
+.subscale small {
+  display: block;
+  color: var(--muted);
+}
+
+.subscale strong {
+  display: block;
+  margin: 4px 0;
+  font-size: 1.35rem;
+}
+
+.scared-items {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcfb;
+}
+
+.scared-items summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.scared-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.scared-item {
+  grid-template-columns: minmax(0, 1fr) 180px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.scared-item select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px 10px;
+  background: white;
 }
 
 .tree-hole {
@@ -531,6 +631,9 @@ output {
 
   .slider-list label,
   .scale-grid label,
+  .scared-meta,
+  .subscale-grid,
+  .scared-item,
   .number-row,
   .record,
   .explain-row,

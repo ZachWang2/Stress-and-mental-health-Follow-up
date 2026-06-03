@@ -1,11 +1,65 @@
 const KEY = "patient-monitor-preview-v2";
 const sliderIds = ["sleepQuality", "somaticLevel", "rechargeEase", "mood", "anxiety", "interest", "energy", "functioning"];
 const weeklyFields = ["mood", "anxiety", "interest", "energy", "functioning"];
+const SCARED_ITEMS = [
+  [1, "当我感到害怕时，会出现呼吸困难。"],
+  [2, "我在学校时感到头痛。"],
+  [3, "我不喜欢与不太熟悉的人在一起。"],
+  [4, "如果我不在家里睡觉，就觉得内心不安。"],
+  [5, "我经常担心别人是不是喜欢我。"],
+  [6, "我害怕时，感到马上要死去似的。"],
+  [7, "我总是感到紧张不安。"],
+  [8, "父母无论去哪里我总是离不开他们。"],
+  [9, "别人说我好像很紧张的样子。"],
+  [10, "当我与不熟悉的人在一起时就感到紧张。"],
+  [11, "在学校时就出现肚子痛。"],
+  [12, "当我害怕时，感觉自己快要发疯、失去控制了。"],
+  [13, "我总担心自己一个人睡觉。"],
+  [14, "我担心自己不像其他孩子一样好。"],
+  [15, "当我害怕时，感到恍恍惚惚、好像周围的一切不真实似的。"],
+  [16, "我梦见父母发生了不幸的事情。"],
+  [17, "我担心又要去上学。"],
+  [18, "我害怕时，会心跳加快。"],
+  [19, "我手脚发抖打颤。"],
+  [20, "我梦见发生了对我不利的事情。"],
+  [21, "我对于一些精心为我而安排的事感到不安和不自在。"],
+  [22, "当我害怕时，我会出汗。"],
+  [23, "我是一个忧虑的人。"],
+  [24, "我无缘无故地感到害怕。"],
+  [25, "我害怕一个人待在家里。"],
+  [26, "我觉得和不熟悉的人说话很困难。"],
+  [27, "当我害怕时，会感到难以呼吸。"],
+  [28, "别人说我担心得太多了。"],
+  [29, "我不愿离开自己的家。"],
+  [30, "我担心以前那种紧张（或惊恐）的感觉再次出现。"],
+  [31, "我总担心父母会出事。"],
+  [32, "当我与不熟悉的人在一起时，会感到害羞。"],
+  [33, "我担心将来会发生什么事情。"],
+  [34, "当我害怕时，会感到恶心、想吐。"],
+  [35, "我担心自己能不能把事情做好。"],
+  [36, "我害怕去上学。"],
+  [37, "我会担心已经发生了的事情。"],
+  [38, "当我害怕时，会感到头昏。"],
+  [39, "当我与其他伙伴或大人在一起做事情时（如大声朗读、说话、游戏或体育活动），如果他们看着我，我就感到紧张。"],
+  [40, "当我去参加有很多不熟悉的人在场的活动或聚会，会感到紧张。"],
+  [41, "我是一个害羞的人。"],
+];
+const SCARED_OPTIONS = [[0, "没有此问题"], [1, "有时有"], [2, "经常有"]];
+const SCARED_SUBSCALES = [
+  ["panicSomatic", "惊恐/躯体症状", 7, [1, 6, 9, 12, 15, 18, 19, 22, 24, 27, 30, 34, 38]],
+  ["generalized", "广泛性焦虑", 9, [5, 7, 14, 21, 23, 28, 33, 35, 37]],
+  ["separation", "分离焦虑", 5, [4, 8, 13, 16, 20, 25, 29, 31]],
+  ["social", "社交焦虑", 8, [3, 10, 26, 32, 39, 40, 41]],
+  ["schoolAvoidance", "学校回避", 3, [2, 11, 17, 36]],
+];
+const SCARED_TOTAL_CUTOFF = 25;
 
 let state = loadState();
 
 document.querySelector("#date").value = today();
 document.querySelector("#weekDate").value = today();
+document.querySelector("#scaredDate").value = today();
+renderScaredInputs();
 
 sliderIds.forEach((id) => {
   const input = document.querySelector(`#${id}`);
@@ -72,15 +126,33 @@ document.querySelector("#ventForm").addEventListener("submit", (event) => {
   persist("树洞内容已保存");
 });
 
+document.querySelector("#scaredForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const answers = {};
+  SCARED_ITEMS.forEach(([id]) => {
+    answers[id] = Number(document.querySelector(`#scared_${id}`).value);
+  });
+  const record = {
+    id: crypto.randomUUID?.() || `scared-${Date.now()}`,
+    date: value("scaredDate"),
+    respondent: value("scaredRespondent") || "儿童/青少年自评",
+    answers,
+    ...scoreScared(answers),
+    createdAt: new Date().toISOString(),
+  };
+  state.scared = [...state.scared.filter((item) => item.date !== record.date), record].sort((a, b) => a.date.localeCompare(b.date));
+  persist("SCARED 量表已保存");
+});
+
 document.querySelector("#seedBtn").addEventListener("click", () => {
   state = seedState();
   persist("示例数据已生成");
 });
 
 document.querySelector("#clearBtn").addEventListener("click", () => {
-  if (!state.daily.length && !state.weekly.length && !state.vents.length) return;
+  if (!state.daily.length && !state.weekly.length && !state.vents.length && !state.scared.length) return;
   if (!window.confirm("确定清空所有本地记录吗？")) return;
-  state = { daily: [], weekly: [], vents: [] };
+  state = { daily: [], weekly: [], vents: [], scared: [] };
   persist("数据已清空");
 });
 
@@ -105,9 +177,9 @@ function today() {
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY));
-    return { daily: saved?.daily || [], weekly: saved?.weekly || [], vents: saved?.vents || [] };
+    return { daily: saved?.daily || [], weekly: saved?.weekly || [], vents: saved?.vents || [], scared: saved?.scared || [] };
   } catch {
-    return { daily: [], weekly: [], vents: [] };
+    return { daily: [], weekly: [], vents: [], scared: [] };
   }
 }
 
@@ -152,8 +224,46 @@ function render() {
   document.querySelector("#weeklyDue").textContent = `下一次建议日期：${nextWeeklyDue(weekly)}`;
   renderSignal(recent, weekly);
   renderExplain(latest);
+  renderScaredResult();
   renderList(daily);
   drawChart(daily.slice(-30));
+}
+
+function renderScaredInputs() {
+  document.querySelector("#scaredList").innerHTML = SCARED_ITEMS.map(([id, text]) => `
+    <label class="scared-item">
+      <span>${id}. ${text}</span>
+      <select id="scared_${id}">
+        ${SCARED_OPTIONS.map(([value, label]) => `<option value="${value}">${value} - ${label}</option>`).join("")}
+      </select>
+    </label>
+  `).join("");
+}
+
+function scoreScared(answers) {
+  const total = SCARED_ITEMS.reduce((sum, [id]) => sum + Number(answers[id] || 0), 0);
+  const subscales = SCARED_SUBSCALES.map(([key, label, cutoff, ids]) => {
+    const score = ids.reduce((sum, id) => sum + Number(answers[id] || 0), 0);
+    return { key, label, cutoff, score, elevated: score >= cutoff };
+  });
+  return { total, totalElevated: total >= SCARED_TOTAL_CUTOFF, subscales };
+}
+
+function renderScaredResult() {
+  const latest = state.scared.sort((a, b) => a.date.localeCompare(b.date))[state.scared.length - 1];
+  if (!latest) {
+    document.querySelector("#scaredSummary").innerHTML = "<strong>尚未保存 SCARED 记录</strong><span>保存后会显示总分和五个分量表。</span>";
+    document.querySelector("#scaredSubscales").innerHTML = "";
+    return;
+  }
+  document.querySelector("#scaredSummary").innerHTML = `<strong>最近一次：${latest.total}/82</strong><span>${latest.totalElevated ? "达到筛查关注线" : "未达筛查关注线"} · 总分关注线 ${SCARED_TOTAL_CUTOFF}</span>`;
+  document.querySelector("#scaredSubscales").innerHTML = latest.subscales.map((scale) => `
+    <article class="${scale.elevated ? "subscale elevated" : "subscale"}">
+      <span>${scale.label}</span>
+      <strong>${scale.score}</strong>
+      <small>关注线 ${scale.cutoff}</small>
+    </article>
+  `).join("");
 }
 
 function renderSignal(recent, weekly) {
@@ -294,15 +404,24 @@ function seedState() {
     const raw = { weekDate: date.toISOString().slice(0, 10), mood: 2, anxiety: 2, interest: 1, energy: 2, functioning: 1, riskFlag: false, note: "示例周评" };
     weekly.push({ ...raw, score: scoreWeekly(raw) });
   }
-  return { daily, weekly, vents };
+  const answers = Object.fromEntries(SCARED_ITEMS.map(([id]) => [id, 0]));
+  [2, 5, 7, 17, 23, 28, 33, 35, 37].forEach((id) => {
+    answers[id] = 1;
+  });
+  [1, 3, 10, 18, 39].forEach((id) => {
+    answers[id] = 2;
+  });
+  const scared = [{ id: "seed-scared", date: today(), respondent: "儿童/青少年自评", answers, ...scoreScared(answers), createdAt: new Date().toISOString() }];
+  return { daily, weekly, vents, scared };
 }
 
 function toCsv() {
   const rows = [
-    ["type", "date", "score", "sleepHours", "sleepQuality", "somaticLevel", "rechargeEase", "shortVideoMinutes", "affirmation1", "affirmation2", "affirmation3", "note", "treeHoleText", "aiConversationReady", "aiDraft"],
-    ...state.daily.map((item) => ["daily", item.date, item.dailyScore, item.sleepHours, item.sleepQuality, item.somaticLevel, item.rechargeEase, item.shortVideoMinutes, item.affirmation1, item.affirmation2, item.affirmation3, item.note, "", "", ""]),
-    ...state.weekly.map((item) => ["weekly", item.weekDate, item.score, "", "", "", "", "", "", "", "", item.note, "", "", ""]),
-    ...state.vents.map((item) => ["treehole", item.createdAt.slice(0, 10), "", "", "", "", "", "", "", "", "", "", item.text, item.aiConversationReady, item.aiDraft]),
+    ["type", "date", "score", "sleepHours", "sleepQuality", "somaticLevel", "rechargeEase", "shortVideoMinutes", "affirmation1", "affirmation2", "affirmation3", "note", "treeHoleText", "aiConversationReady", "aiDraft", "respondent", "scaredTotal", "scaredElevated", "scaredSubscales", "scaredAnswers"],
+    ...state.daily.map((item) => ["daily", item.date, item.dailyScore, item.sleepHours, item.sleepQuality, item.somaticLevel, item.rechargeEase, item.shortVideoMinutes, item.affirmation1, item.affirmation2, item.affirmation3, item.note, "", "", "", "", "", "", "", ""]),
+    ...state.weekly.map((item) => ["weekly", item.weekDate, item.score, "", "", "", "", "", "", "", "", item.note, "", "", "", "", "", "", "", ""]),
+    ...state.vents.map((item) => ["treehole", item.createdAt.slice(0, 10), "", "", "", "", "", "", "", "", "", "", item.text, item.aiConversationReady, item.aiDraft, "", "", "", "", ""]),
+    ...state.scared.map((item) => ["scared", item.date, item.total, "", "", "", "", "", "", "", "", "", "", "", "", item.respondent, item.total, item.totalElevated, item.subscales.map((scale) => `${scale.label}:${scale.score}/${scale.cutoff}`).join("; "), JSON.stringify(item.answers)]),
   ];
   return rows.map((row) => row.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
 }
@@ -316,6 +435,7 @@ function followUpSummary() {
     `最近 7 日日常负荷均值：${recent.length ? Math.round(mean(recent.map((item) => item.dailyScore))) : "--"}`,
     `最近 7 日平均睡眠：${recent.length ? mean(recent.map((item) => item.sleepHours)).toFixed(1) : "--"} 小时`,
     `最近 7 日平均躯体化/疼痛：${recent.length ? mean(recent.map((item) => item.somaticLevel)).toFixed(1) : "--"}/4`,
+    `最近一次 SCARED：${state.scared.length ? `${state.scared[state.scared.length - 1].date}，总分 ${state.scared[state.scared.length - 1].total}/82` : "暂无"}`,
     "",
     "最近三条日常记录：",
     ...daily.slice(-3).reverse().map((item) => `${item.date}：负荷 ${item.dailyScore}/100，睡眠 ${item.sleepHours}h，躯体化/疼痛 ${item.somaticLevel}/4，随心记录：${item.note || "无"}`),

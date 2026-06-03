@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { SCARED_ITEMS, SCARED_OPTIONS, SCARED_SUBSCALES, SCARED_TOTAL_CUTOFF, createEmptyScaredAnswers, scoreScared } from "./scaredScale.js";
 
 const STORAGE_KEY = "patient-monitor-records-v2";
 const today = () => new Date().toISOString().slice(0, 10);
@@ -26,6 +27,12 @@ const defaultWeeklyForm = {
   note: "",
 };
 
+const defaultScaredForm = {
+  date: today(),
+  respondent: "儿童/青少年自评",
+  answers: createEmptyScaredAnswers(),
+};
+
 const dailySliders = [
   ["sleepQuality", "睡眠质量"],
   ["somaticLevel", "躯体化/疼痛"],
@@ -50,9 +57,9 @@ const integrationCards = [
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    return { daily: saved?.daily || [], weekly: saved?.weekly || [], vents: saved?.vents || [] };
+    return { daily: saved?.daily || [], weekly: saved?.weekly || [], vents: saved?.vents || [], scared: saved?.scared || [] };
   } catch {
-    return { daily: [], weekly: [], vents: [] };
+    return { daily: [], weekly: [], vents: [], scared: [] };
   }
 }
 
@@ -187,15 +194,43 @@ function createSeedState() {
     weekly.push({ ...record, score: scoreWeekly(record) });
   }
   vents.push({ id: "seed", createdAt: new Date().toISOString(), text: "今天很烦，但我先把它写下来。", aiConversationReady: true, aiDraft: "请先倾听，不要急着给建议。" });
-  return { daily, weekly, vents };
+  const scaredAnswers = createEmptyScaredAnswers();
+  [2, 5, 7, 17, 23, 28, 33, 35, 37].forEach((id) => {
+    scaredAnswers[id] = 1;
+  });
+  [1, 3, 10, 18, 39].forEach((id) => {
+    scaredAnswers[id] = 2;
+  });
+  const scaredScore = scoreScared(scaredAnswers);
+  const scared = [
+    {
+      id: "seed-scared",
+      date: today(),
+      respondent: "儿童/青少年自评",
+      answers: scaredAnswers,
+      ...scaredScore,
+      createdAt: new Date().toISOString(),
+    },
+  ];
+  return { daily, weekly, vents, scared };
 }
 
-function toCsv(daily, weekly, vents) {
-  const headers = ["type", "date", "score", "sleepHours", "sleepQuality", "somaticLevel", "rechargeEase", "shortVideoMinutes", "affirmation1", "affirmation2", "affirmation3", "note", "treeHoleText", "aiConversationReady", "aiDraft", "riskFlag"];
+function toCsv(daily, weekly, vents, scared) {
+  const headers = ["type", "date", "score", "sleepHours", "sleepQuality", "somaticLevel", "rechargeEase", "shortVideoMinutes", "affirmation1", "affirmation2", "affirmation3", "note", "treeHoleText", "aiConversationReady", "aiDraft", "riskFlag", "respondent", "scaredTotal", "scaredElevated", "scaredSubscales", "scaredAnswers"];
   const rows = [
     ...daily.map((item) => ({ type: "daily", date: item.date, score: item.dailyScore, ...item })),
     ...weekly.map((item) => ({ type: "weekly", date: item.weekDate, score: item.score, ...item })),
     ...vents.map((item) => ({ type: "treehole", date: item.createdAt.slice(0, 10), treeHoleText: item.text, aiConversationReady: item.aiConversationReady, aiDraft: item.aiDraft })),
+    ...scared.map((item) => ({
+      type: "scared",
+      date: item.date,
+      score: item.total,
+      respondent: item.respondent,
+      scaredTotal: item.total,
+      scaredElevated: item.totalElevated,
+      scaredSubscales: item.subscales.map((scale) => `${scale.label}:${scale.score}/${scale.cutoff}`).join("; "),
+      scaredAnswers: JSON.stringify(item.answers),
+    })),
   ].sort((a, b) => String(a.date).localeCompare(String(b.date)));
   return `${headers.join(",")}\n${rows.map((row) => headers.map((header) => csvCell(row[header])).join(",")).join("\n")}`;
 }
@@ -266,6 +301,7 @@ function TrendChart({ daily, weekly }) {
 export default function App() {
   const [dailyForm, setDailyForm] = useState(defaultDailyForm);
   const [weeklyForm, setWeeklyForm] = useState(defaultWeeklyForm);
+  const [scaredForm, setScaredForm] = useState(defaultScaredForm);
   const [ventText, setVentText] = useState("");
   const [aiDraft, setAiDraft] = useState("");
   const [state, setState] = useState(() => loadState());
@@ -274,8 +310,10 @@ export default function App() {
   const daily = useMemo(() => [...state.daily].sort((a, b) => a.date.localeCompare(b.date)), [state.daily]);
   const weekly = useMemo(() => [...state.weekly].sort((a, b) => a.weekDate.localeCompare(b.weekDate)), [state.weekly]);
   const vents = useMemo(() => [...(state.vents || [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt)), [state.vents]);
+  const scared = useMemo(() => [...(state.scared || [])].sort((a, b) => a.date.localeCompare(b.date)), [state.scared]);
   const latestDaily = daily[daily.length - 1];
   const latestWeekly = weekly[weekly.length - 1];
+  const latestScared = scared[scared.length - 1];
   const recentDaily = daily.slice(-7);
   const dailyAverage = recentDaily.length ? Math.round(mean(recentDaily.map((item) => item.dailyScore))) : "--";
   const sleepAverage = recentDaily.length ? mean(recentDaily.map((item) => item.sleepHours)).toFixed(1) : "--";
@@ -289,6 +327,7 @@ export default function App() {
       daily: [...nextState.daily].sort((a, b) => a.date.localeCompare(b.date)),
       weekly: [...nextState.weekly].sort((a, b) => a.weekDate.localeCompare(b.weekDate)),
       vents: [...(nextState.vents || [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+      scared: [...(nextState.scared || [])].sort((a, b) => a.date.localeCompare(b.date)),
     };
     setState(ordered);
     saveState(ordered);
@@ -302,6 +341,13 @@ export default function App() {
 
   function updateWeeklyField(name, value) {
     setWeeklyForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function updateScaredAnswer(id, value) {
+    setScaredForm((current) => ({
+      ...current,
+      answers: { ...current.answers, [id]: Number(value) },
+    }));
   }
 
   function saveDaily(event) {
@@ -339,6 +385,20 @@ export default function App() {
     persist({ ...state, weekly: [...weekly.filter((item) => item.weekDate !== record.weekDate), record] }, "周评已保存");
   }
 
+  function saveScared(event) {
+    event.preventDefault();
+    const result = scoreScared(scaredForm.answers);
+    const record = {
+      id: crypto.randomUUID?.() || `scared-${Date.now()}`,
+      date: scaredForm.date,
+      respondent: scaredForm.respondent,
+      answers: scaredForm.answers,
+      ...result,
+      createdAt: new Date().toISOString(),
+    };
+    persist({ ...state, scared: [...scared.filter((item) => item.date !== record.date), record] }, "SCARED 量表已保存");
+  }
+
   function saveVent(event) {
     event.preventDefault();
     const text = ventText.trim();
@@ -360,11 +420,11 @@ export default function App() {
   }
 
   function exportCsv() {
-    if (!daily.length && !weekly.length && !vents.length) {
+    if (!daily.length && !weekly.length && !vents.length && !scared.length) {
       setStatus("暂无数据可导出");
       return;
     }
-    const blob = new Blob([toCsv(daily, weekly, vents)], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob([toCsv(daily, weekly, vents, scared)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -383,6 +443,7 @@ export default function App() {
       `最近 7 日平均睡眠：${sleepAverage} 小时`,
       `最近 7 日平均躯体化/疼痛：${somaticAverage}/4`,
       `最近一次周评：${latestWeekly ? `${latestWeekly.weekDate}，${latestWeekly.score}/100（${severity(latestWeekly.score)}）` : "暂无"}`,
+      `最近一次 SCARED：${latestScared ? `${latestScared.date}，总分 ${latestScared.total}/${SCARED_ITEMS.length * 2}（${latestScared.totalElevated ? "达到筛查关注线" : "未达筛查关注线"}）` : "暂无"}`,
       "",
       `当前提示：${signal.title}`,
       signal.text,
@@ -401,9 +462,9 @@ export default function App() {
   }
 
   function clearAll() {
-    if (!daily.length && !weekly.length && !vents.length) return;
+    if (!daily.length && !weekly.length && !vents.length && !scared.length) return;
     if (!window.confirm("确定清空所有本地记录吗？")) return;
-    persist({ daily: [], weekly: [], vents: [] }, "数据已清空");
+    persist({ daily: [], weekly: [], vents: [], scared: [] }, "数据已清空");
   }
 
   function placeholder(message) {
@@ -507,6 +568,72 @@ export default function App() {
           <label className="risk-check"><input checked={weeklyForm.riskFlag} onChange={(event) => updateWeeklyField("riskFlag", event.target.checked)} type="checkbox" /><span>本周出现需要医生或可信赖的人尽快知道的风险想法/行为</span></label>
           <label className="note-field">周评备注<textarea value={weeklyForm.note} onChange={(event) => updateWeeklyField("note", event.target.value)} rows="3" placeholder="可选：本周变化、诱因、药物副作用、想和医生讨论的问题" /></label>
           <button className="primary" type="submit">保存周评</button>
+        </form>
+      </section>
+
+      <section className="scared-card">
+        <form className="scared-form" onSubmit={saveScared}>
+          <div className="form-head">
+            <div>
+              <p className="eyebrow">SCARED Scale</p>
+              <h2>儿童青少年焦虑性情绪筛查量表</h2>
+              <p className="subtle">根据最近 3 个月的实际感受填写：0 = 没有此问题，1 = 有时有，2 = 经常有。筛查结果只作为临床沟通线索。</p>
+            </div>
+            <div className="scared-meta">
+              <label>
+                填写日期
+                <input value={scaredForm.date} onChange={(event) => setScaredForm((current) => ({ ...current, date: event.target.value }))} type="date" required />
+              </label>
+              <label>
+                填写人
+                <input value={scaredForm.respondent} onChange={(event) => setScaredForm((current) => ({ ...current, respondent: event.target.value }))} />
+              </label>
+            </div>
+          </div>
+
+          <div className="scared-summary">
+            {latestScared ? (
+              <>
+                <strong>最近一次：{latestScared.total}/82</strong>
+                <span>{latestScared.totalElevated ? "达到筛查关注线" : "未达筛查关注线"} · 总分关注线 {SCARED_TOTAL_CUTOFF}</span>
+              </>
+            ) : (
+              <>
+                <strong>尚未保存 SCARED 记录</strong>
+                <span>保存后会显示总分和五个分量表。</span>
+              </>
+            )}
+          </div>
+
+          {latestScared && (
+            <div className="subscale-grid">
+              {latestScared.subscales.map((scale) => (
+                <article className={scale.elevated ? "subscale elevated" : "subscale"} key={scale.key}>
+                  <span>{scale.label}</span>
+                  <strong>{scale.score}</strong>
+                  <small>关注线 {scale.cutoff}</small>
+                </article>
+              ))}
+            </div>
+          )}
+
+          <details className="scared-items">
+            <summary>展开 41 个题目</summary>
+            <div className="scared-list">
+              {SCARED_ITEMS.map((item) => (
+                <label className="scared-item" key={item.id}>
+                  <span>{item.id}. {item.text}</span>
+                  <select value={scaredForm.answers[item.id]} onChange={(event) => updateScaredAnswer(item.id, event.target.value)}>
+                    {SCARED_OPTIONS.map((option) => (
+                      <option value={option.value} key={option.value}>{option.value} - {option.label}</option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          </details>
+
+          <button className="primary" type="submit">保存 SCARED 量表</button>
         </form>
       </section>
 

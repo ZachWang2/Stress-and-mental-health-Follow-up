@@ -91,6 +91,29 @@
         </form>
       </section>
 
+      <section class="scared-card">
+        <form id="scaredForm" class="scared-form">
+          <div class="form-head">
+            <div>
+              <p class="eyebrow">SCARED Scale</p>
+              <h2>儿童青少年焦虑性情绪筛查量表</h2>
+              <p class="subtle">根据最近 3 个月的实际感受填写：0 = 没有此问题，1 = 有时有，2 = 经常有。</p>
+            </div>
+            <div class="scared-meta">
+              <label>填写日期<input id="scaredDate" type="date" required /></label>
+              <label>填写人<input id="scaredRespondent" value="儿童/青少年自评" /></label>
+            </div>
+          </div>
+          <div id="scaredSummary" class="scared-summary"><strong>尚未保存 SCARED 记录</strong><span>保存后会显示总分和五个分量表。</span></div>
+          <div id="scaredSubscales" class="subscale-grid"></div>
+          <details class="scared-items">
+            <summary>展开 41 个题目</summary>
+            <div id="scaredList" class="scared-list"></div>
+          </details>
+          <button class="primary" type="submit">保存 SCARED 量表</button>
+        </form>
+      </section>
+
       <section class="tree-hole">
         <form id="ventForm">
           <div class="form-head">
