@@ -477,8 +477,8 @@ export default function App() {
       <section className="topbar">
         <div>
           <p className="eyebrow">Low Burden Patient Monitor</p>
-          <h1>精神心理随访本地原型</h1>
-          <p className="lead">日常只记录睡眠、躯体化/疼痛、缓过来一点和三件自我肯定；每周一次标准化周评，减少填写负担。</p>
+          <h1>精神心理随访demo</h1>
+          <p className="lead">日常记录睡眠、躯体化/疼痛和三件自我肯定；每周一次标准化周评，减少填写负担。</p>
         </div>
         <div className="top-actions">
           <button type="button" onClick={seedData}>生成示例数据</button>
