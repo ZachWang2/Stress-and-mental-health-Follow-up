@@ -1,5 +1,8 @@
-import { useMemo, useState } from "react";
-import { SCARED_ITEMS, SCARED_OPTIONS, SCARED_SUBSCALES, SCARED_TOTAL_CUTOFF, createEmptyScaredAnswers, scoreScared } from "./scaredScale.js";
+import { useEffect, useMemo, useState } from "react";
+import AuthPanel from "./components/AuthPanel.jsx";
+import { supabase, isSupabaseConfigured } from "./lib/supabase.js";
+import { clearRemoteState, hasRecords, loadRemoteState, syncStateToRemote } from "./lib/remoteStore.js";
+import { SCARED_ITEMS, SCARED_OPTIONS, SCARED_TOTAL_CUTOFF, createEmptyScaredAnswers, scoreScared } from "./scaredScale.js";
 
 const STORAGE_KEY = "patient-monitor-records-v2";
 const today = () => new Date().toISOString().slice(0, 10);
@@ -305,6 +308,9 @@ export default function App() {
   const [ventText, setVentText] = useState("");
   const [aiDraft, setAiDraft] = useState("");
   const [state, setState] = useState(() => loadState());
+  const [session, setSession] = useState(null);
+  const [authBusy, setAuthBusy] = useState(isSupabaseConfigured);
+  const [remoteBusy, setRemoteBusy] = useState(false);
   const [status, setStatus] = useState("本地保存");
 
   const daily = useMemo(() => [...state.daily].sort((a, b) => a.date.localeCompare(b.date)), [state.daily]);
@@ -321,6 +327,70 @@ export default function App() {
   const signal = clinicalSignal(daily, weekly);
   const reliability = reliabilitySignal(daily, weekly);
   const explanation = dailyExplanation(latestDaily);
+  const busy = authBusy || remoteBusy;
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return undefined;
+    let active = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setSession(data.session);
+      setAuthBusy(false);
+    });
+
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setAuthBusy(false);
+    });
+
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+
+    async function hydrateFromCloud() {
+      setRemoteBusy(true);
+      setStatus("正在读取云端数据");
+      try {
+        const remoteState = await loadRemoteState();
+        if (!active) return;
+        if (hasRecords(remoteState)) {
+          setState(remoteState);
+          saveState(remoteState);
+          setStatus("云端数据已加载");
+        } else if (hasRecords(state)) {
+          await syncStateToRemote(state);
+          setStatus("本地历史数据已同步到云端");
+        } else {
+          setStatus("云端同步已开启");
+        }
+      } catch (error) {
+        if (active) setStatus(`云端读取失败：${error.message}`);
+      } finally {
+        if (active) setRemoteBusy(false);
+      }
+    }
+
+    hydrateFromCloud();
+    return () => {
+      active = false;
+    };
+  }, [session?.user?.id]);
+
+  function baseStatus() {
+    return session ? "云端同步已开启" : "本地保存";
+  }
+
+  function showTemporaryStatus(message, delay = 2200) {
+    setStatus(message);
+    window.setTimeout(() => setStatus(baseStatus()), delay);
+  }
 
   function persist(nextState, message) {
     const ordered = {
@@ -331,8 +401,14 @@ export default function App() {
     };
     setState(ordered);
     saveState(ordered);
-    setStatus(message);
-    window.setTimeout(() => setStatus("本地保存"), 1800);
+    if (!session) {
+      showTemporaryStatus(message);
+      return;
+    }
+    setStatus(`${message}，正在同步云端`);
+    syncStateToRemote(ordered)
+      .then(() => showTemporaryStatus(`${message}，已同步云端`))
+      .catch((error) => setStatus(`${message}，云端同步失败：${error.message}`));
   }
 
   function updateDailyField(name, value) {
@@ -419,6 +495,21 @@ export default function App() {
     persist(createSeedState(), "示例数据已生成");
   }
 
+  async function signOut() {
+    if (!supabase) return;
+    setRemoteBusy(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setSession(null);
+      setStatus("已退出，切回本地保存");
+    } catch (error) {
+      setStatus(`退出失败：${error.message}`);
+    } finally {
+      setRemoteBusy(false);
+    }
+  }
+
   function exportCsv() {
     if (!daily.length && !weekly.length && !vents.length && !scared.length) {
       setStatus("暂无数据可导出");
@@ -463,13 +554,17 @@ export default function App() {
 
   function clearAll() {
     if (!daily.length && !weekly.length && !vents.length && !scared.length) return;
-    if (!window.confirm("确定清空所有本地记录吗？")) return;
+    if (!window.confirm(session ? "确定清空本地和当前账号的云端记录吗？" : "确定清空所有本地记录吗？")) return;
     persist({ daily: [], weekly: [], vents: [], scared: [] }, "数据已清空");
+    if (session) {
+      clearRemoteState()
+        .then(() => showTemporaryStatus("本地和云端数据已清空"))
+        .catch((error) => setStatus(`本地已清空，云端清空失败：${error.message}`));
+    }
   }
 
   function placeholder(message) {
-    setStatus(message);
-    window.setTimeout(() => setStatus("本地保存"), 1800);
+    showTemporaryStatus(message);
   }
 
   return (
@@ -486,6 +581,8 @@ export default function App() {
           <button type="button" onClick={exportSummary}>导出复诊摘要</button>
         </div>
       </section>
+
+      <AuthPanel session={session} busy={busy} onSignOut={signOut} onMessage={setStatus} />
 
       <section className="summary" aria-live="polite">
         <article><span>最新日常负荷</span><strong>{latestDaily ? latestDaily.dailyScore : "--"}</strong></article>
@@ -539,8 +636,8 @@ export default function App() {
         {integrationCards.map(([title, cardStatus, text]) => (
           <article className="integration-card" key={title}>
             <div><p className="eyebrow">Interface</p><h2>{title}</h2></div>
-            <span>{cardStatus}</span>
-            <p>{text}</p>
+            <span>{title === "联网同步接口" ? (session ? "云端同步" : "本地模式") : cardStatus}</span>
+            <p>{title === "联网同步接口" ? (session ? "已接入 Supabase Auth 与数据库，同账号可跨设备读取记录。" : text) : text}</p>
             {title === "睡眠质量接口" && <button type="button" onClick={() => placeholder("睡眠质量接口已预留，尚未实装")}>同步睡眠</button>}
             {title === "蓝牙设备接口" && <button type="button" onClick={() => placeholder("蓝牙设备接口已预留，尚未实装")}>连接蓝牙</button>}
             {title === "App 使用监管接口" && <button type="button" onClick={() => placeholder("App 使用监管接口已预留，尚未实装")}>读取使用时长</button>}
@@ -640,8 +737,8 @@ export default function App() {
       <section className="tree-hole">
         <form onSubmit={saveVent}>
           <div className="form-head">
-            <div><p className="eyebrow">Private Outlet</p><h2>树洞</h2><p className="subtle">可以发泄情绪、输出负能量或写下不想整理的话。当前只保存在本地。</p></div>
-            <span className="save-status">AI 接口预留</span>
+            <div><p className="eyebrow">Private Outlet</p><h2>树洞</h2><p className="subtle">可以发泄情绪、输出负能量或写下不想整理的话。登录后会同步到当前账号。</p></div>
+            <span className="save-status">{session ? "云端同步 + AI 接口预留" : "AI 接口预留"}</span>
           </div>
           <textarea value={ventText} onChange={(event) => setVentText(event.target.value)} rows="5" placeholder="把今天憋着的话写在这里。这里不是诊断，也不会评价你。" />
           <label className="note-field">未来 AI 对话上下文接口<textarea value={aiDraft} onChange={(event) => setAiDraft(event.target.value)} rows="3" placeholder="可选：未来接入 AI 时，希望它如何回应？比如只倾听、帮我整理、提醒我联系医生。" /></label>
@@ -689,7 +786,7 @@ export default function App() {
 
       <section className="research-note">
         <h2>定位说明</h2>
-        <p>这个本地版面向“已确诊患者的日常随访练习”：日常指标只做趋势监测，每周周评用于标准化回顾。联网、蓝牙、AI 对话和 App 使用监管目前只是接口占位。它不是诊断工具，也不能替代医生评估；风险勾选只作为复核提示，正式产品必须接入明确的危机处理流程。</p>
+        <p>这个版本面向“已确诊患者的日常随访练习”：日常指标只做趋势监测，每周周评用于标准化回顾。Supabase 已用于账号和云端数据保存；蓝牙、AI 对话和 App 使用监管目前仍是接口占位。它不是诊断工具，也不能替代医生评估；风险勾选只作为复核提示，正式产品必须接入明确的危机处理流程。</p>
       </section>
     </main>
   );

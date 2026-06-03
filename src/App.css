@@ -114,6 +114,56 @@ button:hover {
   box-shadow: 0 10px 20px rgba(24, 33, 42, 0.1);
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+  transform: none;
+}
+
+.auth-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 440px);
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--green);
+  border-radius: 8px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow);
+}
+
+.auth-panel.connected {
+  border-left-color: var(--blue);
+}
+
+.auth-panel.warning {
+  grid-template-columns: 1fr;
+  border-left-color: var(--amber);
+}
+
+.auth-panel h2 {
+  margin-bottom: 8px;
+}
+
+.auth-panel p {
+  margin-bottom: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.auth-form {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
 .summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -606,6 +656,7 @@ output {
 
 @media (max-width: 940px) {
   .topbar,
+  .auth-panel,
   .summary,
   .workspace,
   .analysis-grid,
