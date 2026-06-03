@@ -309,7 +309,7 @@ export default function App() {
   const [aiDraft, setAiDraft] = useState("");
   const [state, setState] = useState(() => loadState());
   const [session, setSession] = useState(null);
-  const [authBusy, setAuthBusy] = useState(isSupabaseConfigured);
+  const [authBusy, setAuthBusy] = useState(false);
   const [remoteBusy, setRemoteBusy] = useState(false);
   const [status, setStatus] = useState("本地保存");
 
@@ -333,11 +333,18 @@ export default function App() {
     if (!isSupabaseConfigured) return undefined;
     let active = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      setSession(data.session);
-      setAuthBusy(false);
-    });
+    setAuthBusy(true);
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        setSession(data.session);
+      })
+      .catch((error) => {
+        if (active) setStatus(`登录状态读取失败：${error.message}`);
+      })
+      .finally(() => {
+        if (active) setAuthBusy(false);
+      });
 
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
